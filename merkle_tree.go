@@ -25,6 +25,7 @@ type MerkleTree struct {
 	merkleRoot   []byte
 	Leafs        []*Node
 	hashStrategy func() hash.Hash
+	hashSortFunc func(int, []byte, int, []byte) (int, int)
 }
 
 //Node represents a node, root, or leaf in the tree. It stores pointers to its immediate
@@ -38,6 +39,12 @@ type Node struct {
 	dup    bool
 	Hash   []byte
 	C      Content
+}
+
+// TreeConfig Merkle tree config
+type TreeConfig struct {
+	HashStrategy func() hash.Hash
+	HashSortFunc func(int, []byte, int, []byte) (int, int)
 }
 
 //verifyNode walks down the tree until hitting a leaf, calculating the hash at each level
@@ -78,6 +85,10 @@ func (n *Node) calculateNodeHash() ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
+func defaultHashSortFunc(left int, leftHash []byte, right int, rightHash []byte) (int, int) {
+	return left, right
+}
+
 //NewTree creates a new Merkle Tree using the content cs.
 func NewTree(cs []Content) (*MerkleTree, error) {
 	var defaultHashStrategy = sha256.New
@@ -100,6 +111,24 @@ func NewTree(cs []Content) (*MerkleTree, error) {
 func NewTreeWithHashStrategy(cs []Content, hashStrategy func() hash.Hash) (*MerkleTree, error) {
 	t := &MerkleTree{
 		hashStrategy: hashStrategy,
+	}
+	root, leafs, err := buildWithContent(cs, t)
+	if err != nil {
+		return nil, err
+	}
+	t.Root = root
+	t.Leafs = leafs
+	t.merkleRoot = root.Hash
+	return t, nil
+}
+
+//NewTreeWithHashStrategy creates a new Merkle Tree using the content cs using the provided hash
+//strategy. Note that the hash type used in the type that implements the Content interface must
+//match the hash type profided to the tree.
+func NewTreeWithConfig(cs []Content, config *TreeConfig) (*MerkleTree, error) {
+	t := &MerkleTree{
+		hashStrategy: config.HashStrategy,
+		hashSortFunc: config.HashSortFunc,
 	}
 	root, leafs, err := buildWithContent(cs, t)
 	if err != nil {
@@ -189,6 +218,9 @@ func buildIntermediate(nl []*Node, t *MerkleTree) (*Node, error) {
 		if i+1 == len(nl) {
 			right = i
 		}
+
+		left, right = t.hashSortFunc(left, nl[left].Hash, right, nl[right].Hash)
+
 		chash := append(nl[left].Hash, nl[right].Hash...)
 		if _, err := h.Write(chash); err != nil {
 			return nil, err
