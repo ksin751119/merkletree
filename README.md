@@ -1,8 +1,8 @@
 <h1 align="center">Merkle Tree in Golang</h1>
 <p align="center">
-<a href="https://travis-ci.org/cbergoon/merkletree"><img src="https://travis-ci.org/cbergoon/merkletree.svg?branch=master" alt="Build"></a>
-<a href="https://goreportcard.com/report/github.com/cbergoon/merkletree"><img src="https://goreportcard.com/badge/github.com/cbergoon/merkletree?1=1" alt="Report"></a>
-<a href="https://godoc.org/github.com/cbergoon/merkletree"><img src="https://img.shields.io/badge/godoc-reference-brightgreen.svg" alt="Docs"></a>
+<a href="https://travis-ci.org/ksin751119/merkletree"><img src="https://travis-ci.org/ksin751119/merkletree.svg?branch=master" alt="Build"></a>
+<a href="https://goreportcard.com/report/github.com/ksin751119/merkletree"><img src="https://goreportcard.com/badge/github.com/ksin751119/merkletree?1=1" alt="Report"></a>
+<a href="https://godoc.org/github.com/ksin751119/merkletree"><img src="https://img.shields.io/badge/godoc-reference-brightgreen.svg" alt="Docs"></a>
 <a href="#"><img src="https://img.shields.io/badge/version-0.1.0-brightgreen.svg" alt="Version"></a>
 </p>
 
@@ -16,13 +16,13 @@ the tree. This property allows the tree to be reproduced and thus verified by on
 of the tree. The benefit of the tree structure is verifying any single content entry in the tree will require only
 nlog2(n) steps in the worst case.
 
-#### Documentation 
+#### Documentation
 
-See the docs [here](https://godoc.org/github.com/cbergoon/merkletree).
+See the docs [here](https://godoc.org/github.com/ksin751119/merkletree).
 
 #### Install
 ```
-go get github.com/cbergoon/merkletree
+go get github.com/ksin751119/merkletree
 ```
 
 #### Example Usage
@@ -34,7 +34,7 @@ import (
   "crypto/sha256"
   "log"
 
-  "github.com/cbergoon/merkletree"
+  "github.com/ksin751119/merkletree"
 )
 
 //TestContent implements the Content interface provided by merkletree and represents the content stored in the tree.
@@ -95,8 +95,84 @@ func main() {
 }
 
 ```
-#### Sample
-![merkletree](merkle_tree.png)
+
+#### Example Usage 2
+Below is an example that makes use of the entire API - its quite small.
+
+```go
+package main
+
+import (
+  "crypto/sha256"
+  "log"
+  "golang.org/x/crypto/sha3"
+
+  "github.com/ksin751119/merkletree"
+  "github.com/ethereum/go-ethereum/common"
+  "github.com/ethereum/go-ethereum/crypto"
+
+)
+
+type TestContent struct {
+	Address string
+	Amount  *big.Int
+}
+
+func (t TestContent) CalculateHash() ([]byte, error) {
+	hash := crypto.Keccak256(
+		common.HexToAddress(t.Address).Bytes(),
+		common.LeftPadBytes(t.Amount.Bytes(), 32),
+	)
+	return hash, nil
+}
+
+func (t TestContent) Equals(other merkletree.Content) (bool, error) {
+	return t.Address == other.(TestContent).Address && t.Amount == other.(TestContent).Amount, nil
+
+}
+
+func hashSort(left int, leftHash []byte, right int, rightHash[]byte) (int, int){
+	if bytes.Compare(nl[left].Hash, nl[right].Hash) > 0 {
+			return right, left
+  }
+  return left, right
+}
+
+func main() {
+  //Build list of Content to build tree
+  var list []merkletree.Content
+  list = append(list, TestContent{Address: "0x30afBFe6B5eBC2F5f008F819fc0Eb1E71ad5B265", Amount: big.NewInt(1000000000000000000)})
+  list = append(list, TestContent{Address: "0x1b57b3A1d5b4aa8E218F54FafB00975699463e6e", Amount: big.NewInt(1000000000000000000)})
+  list = append(list, TestContent{Address: "0xAA293A146aAf9E05BeDD1Ff29B0da5bD8BE70955", Amount: big.NewInt(1000000000000000000)})
+
+  config := &TreeConfig{
+    	HashStrategy: sha3.NewLegacyKeccak256,
+	    HashSortFunc: hashSort,
+  }
+
+	//Create a new Merkle Tree from the list of Content
+	t, err := merkletree.NewTreeWithConfig(list, sha3.NewLegacyKeccak256)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//Get the Merkle Root of the tree
+	mr := t.MerkleRoot()
+	log.Printf("Root: 0x%x", mr)
+
+	proofs, deep, _ := t.GetMerklePath(list[1])
+	for idx, pr1 := range proofs {
+		log.Printf("proof[%d]: 0x%x", idx, pr1)
+	}
+
+	for idx, l := range list {
+		h, _ := l.CalculateHash()
+		log.Printf("leaf[%d] hash: %x\n", idx, h)
+	}
+}
+
+```
 
 
 #### License
