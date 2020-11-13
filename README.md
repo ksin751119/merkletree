@@ -103,14 +103,15 @@ Below is an example that makes use of the entire API - its quite small.
 package main
 
 import (
-  "crypto/sha256"
-  "log"
-  "golang.org/x/crypto/sha3"
+	"bytes"
+	"log"
+	"math/big"
 
-  "github.com/ksin751119/merkletree"
-  "github.com/ethereum/go-ethereum/common"
-  "github.com/ethereum/go-ethereum/crypto"
+	"golang.org/x/crypto/sha3"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ksin751119/merkletree"
 )
 
 type TestContent struct {
@@ -131,27 +132,27 @@ func (t TestContent) Equals(other merkletree.Content) (bool, error) {
 
 }
 
-func hashSort(left int, leftHash []byte, right int, rightHash[]byte) (int, int){
-	if bytes.Compare(nl[left].Hash, nl[right].Hash) > 0 {
-			return right, left
-  }
-  return left, right
+func hashSort(left int, leftHash []byte, right int, rightHash []byte) (int, int) {
+	if bytes.Compare(leftHash, rightHash) > 0 {
+		return right, left
+	}
+	return left, right
 }
 
 func main() {
-  //Build list of Content to build tree
-  var list []merkletree.Content
-  list = append(list, TestContent{Address: "0x30afBFe6B5eBC2F5f008F819fc0Eb1E71ad5B265", Amount: big.NewInt(1000000000000000000)})
-  list = append(list, TestContent{Address: "0x1b57b3A1d5b4aa8E218F54FafB00975699463e6e", Amount: big.NewInt(1000000000000000000)})
-  list = append(list, TestContent{Address: "0xAA293A146aAf9E05BeDD1Ff29B0da5bD8BE70955", Amount: big.NewInt(1000000000000000000)})
+	//Build list of Content to build tree
+	var list []merkletree.Content
+	list = append(list, TestContent{Address: "0x30afBFe6B5eBC2F5f008F819fc0Eb1E71ad5B265", Amount: big.NewInt(1000000000000000000)})
+	list = append(list, TestContent{Address: "0x1b57b3A1d5b4aa8E218F54FafB00975699463e6e", Amount: big.NewInt(1000000000000000000)})
+	list = append(list, TestContent{Address: "0xAA293A146aAf9E05BeDD1Ff29B0da5bD8BE70955", Amount: big.NewInt(1000000000000000000)})
 
-  config := &TreeConfig{
-    	HashStrategy: sha3.NewLegacyKeccak256,
-	    HashSortFunc: hashSort,
-  }
+	config := &merkletree.TreeConfig{
+		HashStrategy: sha3.NewLegacyKeccak256,
+		HashSortFunc: hashSort,
+	}
 
 	//Create a new Merkle Tree from the list of Content
-	t, err := merkletree.NewTreeWithConfig(list, sha3.NewLegacyKeccak256)
+	t, err := merkletree.NewTreeWithConfig(list, config)
 
 	if err != nil {
 		log.Fatal(err)
@@ -161,7 +162,7 @@ func main() {
 	mr := t.MerkleRoot()
 	log.Printf("Root: 0x%x", mr)
 
-	proofs, deep, _ := t.GetMerklePath(list[1])
+	proofs, _, _ := t.GetMerklePath(list[1])
 	for idx, pr1 := range proofs {
 		log.Printf("proof[%d]: 0x%x", idx, pr1)
 	}
@@ -171,6 +172,7 @@ func main() {
 		log.Printf("leaf[%d] hash: %x\n", idx, h)
 	}
 }
+
 
 ```
 
